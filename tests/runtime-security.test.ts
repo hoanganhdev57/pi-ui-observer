@@ -11,4 +11,9 @@ describe("runtime connection policy", () => {
     const transport = createPlaywrightTransport({ cdpEndpoint: "http://example.com:9222" });
     await expect(transport.connect({})).rejects.toMatchObject({ code: "HOST_NOT_ALLOWED" });
   });
+
+  it("reports a missing CDP endpoint as unavailable", async () => {
+    const transport = createPlaywrightTransport({ cdpEndpoint: "http://127.0.0.1:1" });
+    await expect(transport.status()).resolves.toMatchObject({ available: false });
+  });
 });

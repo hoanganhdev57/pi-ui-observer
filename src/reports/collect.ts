@@ -19,12 +19,14 @@ export async function collectAudit(adapter: UiAdapter, options: { responsive?: b
   const responsive = options.responsive ?? false;
   const sizes = responsive ? [...DEFAULT_VIEWPORTS] : [initial.viewport];
   const viewports: CollectedAudit["viewports"] = [];
+  let capturedScreenshot = false;
   try {
     for (const size of sizes) {
       if (responsive) await adapter.setViewport(size);
       const measurement = await adapter.audit();
       const screenshot = await adapter.screenshot();
       let path: string | undefined;
+      capturedScreenshot ||= screenshot.bytes instanceof Uint8Array;
       if (options.persistScreenshots !== false && screenshot.bytes instanceof Uint8Array) {
         path = (await writeArtifact(`audit-${Date.now()}-${size.width}x${size.height}`, { kind: "screenshot", bytes: screenshot.bytes })).path;
       }
@@ -34,7 +36,7 @@ export async function collectAudit(adapter: UiAdapter, options: { responsive?: b
     if (responsive) await adapter.setViewport(initial.viewport);
   }
   const [snapshot, consoleReport, networkReport] = await Promise.all([adapter.snapshot(), adapter.console(), adapter.network()]);
-  const report = buildUiAudit({ snapshot, screenshot: viewports.some((v) => v.screenshot) || options.persistScreenshots === false ? true : null, console: Array.isArray(consoleReport.entries) ? consoleReport.entries : [], network: Array.isArray(networkReport.requests) ? networkReport.requests : [] });
+  const report = buildUiAudit({ snapshot, screenshot: capturedScreenshot ? true : null, console: Array.isArray(consoleReport.entries) ? consoleReport.entries : [], network: Array.isArray(networkReport.requests) ? networkReport.requests : [] });
   for (const viewport of viewports) {
     if (viewport.horizontalOverflow) report.findings.push({ severity: "fail", message: `Horizontal overflow at ${viewport.width}px (document: ${viewport.documentWidth ?? "unknown"}px).`, evidence: viewport.screenshot ? [viewport.screenshot] : [] });
   }

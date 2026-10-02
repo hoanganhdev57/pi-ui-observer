@@ -2,6 +2,11 @@
   "name": "pi-ui-observer",
   "version": "0.1.0",
   "description": "Global Pi browser UI observation and evidence-first audit tools",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/hoanganhdev57/pi-ui-observer.git" },
+  "homepage": "https://github.com/hoanganhdev57/pi-ui-observer#readme",
+  "bugs": { "url": "https://github.com/hoanganhdev57/pi-ui-observer/issues" },
+  "files": ["extensions", "skills", "src", "README.md", "SECURITY.md", "LICENSE"],
   "keywords": ["pi-package", "browser", "ui", "debugging", "mcp"],
   "engines": { "node": ">=22.19.0" },
   "type": "module",
@@ -13,13 +18,18 @@
     "ci": "npm run typecheck && npm test && npm run package:check"
   },
   "dependencies": {
-    "playwright-core": "latest"
+    "playwright-core": "^1.63.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "typebox": "*"
   },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": { "optional": true },
+    "typebox": { "optional": true }
+  },
   "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^1.0.0",
     "@types/node": "latest",
     "typebox": "latest",
     "typescript": "latest",

@@ -24,8 +24,8 @@ function result(value: unknown) {
 export function registerUiObserver(pi: RegistrationApi, manager?: UiSessionManager): void {
   let browserToolsConnected = false;
   const executeRead = async (operation: (session: UiSessionManager) => Promise<unknown>) => {
-    if (!manager) return result({ error: "UI session manager is not initialized" });
-    try { return result(await operation(manager)); } catch (error) { return result({ error: error instanceof Error ? error.message : String(error) }); }
+    if (!manager) throw new Error("UI session manager is not initialized");
+    return result(await operation(manager));
   };
 
   const tools = [
@@ -47,18 +47,6 @@ export function registerUiObserver(pi: RegistrationApi, manager?: UiSessionManag
     { name: "ui_audit", description: "Capture browser evidence and check responsive overflow.", parameters: Type.Object({}), execute: () => executeRead((s) => collectAudit(s.adapter(), { responsive: s.active()?.mode === "isolated" })) },
   ];
   for (const definition of tools) pi.registerTool({ ...definition, label: definition.name, risk: "read" });
-
-  pi.registerTool({
-    name: "ui_click",
-    label: "ui_click",
-    description: "Click a UI element after user approval.",
-    parameters: Type.Object({ target: Type.String() }),
-    risk: "interaction",
-    async execute(_id: string, params: { target: string }, _signal: AbortSignal, _update: unknown, ctx: ToolContext) {
-      const approved = await ctx.ui?.confirm?.("Approve UI click", `Click ${params.target}?`);
-      return result({ approved: Boolean(approved), message: approved ? "Click transport is not implemented for this adapter." : "Click cancelled." });
-    },
-  });
 
   pi.registerCommand("ui", {
     description: "Connect to and inspect a browser UI",
@@ -108,7 +96,13 @@ export function registerUiObserver(pi: RegistrationApi, manager?: UiSessionManag
           const audit = await collectAudit(manager.adapter(), { responsive: manager.active()?.mode === "isolated" });
           return ctx.ui?.notify?.(`UI audit: ${audit.findings.map((finding) => `${finding.severity.toUpperCase()} ${finding.message}`).join("; ")}`, "info");
         }
-        return ctx.ui?.notify?.(`Unknown command: ${command}. Use status|connect|disconnect|inspect|audit.`, "error");
+        if (command === "screenshot") {
+          const screenshot = await manager.adapter().screenshot();
+          if (!(screenshot.bytes instanceof Uint8Array)) throw new Error("Adapter did not return image bytes");
+          const artifact = await writeArtifact(`capture-${Date.now()}`, { kind: "screenshot", bytes: screenshot.bytes });
+          return ctx.ui?.notify?.(`Screenshot saved: ${artifact.path}`, "info");
+        }
+        return ctx.ui?.notify?.(`Unknown command: ${command}. Use status|connect|disconnect|inspect|screenshot|audit.`, "error");
       } catch (error) {
         return ctx.ui?.notify?.(error instanceof Error ? error.message : String(error), "error");
       }

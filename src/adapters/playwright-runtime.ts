@@ -20,7 +20,16 @@ export function createPlaywrightTransport(options: RuntimeOptions = {}): Adapter
 
   return {
     async status() {
-      if (options.cdpEndpoint) return { available: true, detail: `CDP ${options.cdpEndpoint}` };
+      if (options.cdpEndpoint) {
+        if (!isAllowedHost(options.cdpEndpoint, defaultHostPolicy)) return { available: false, detail: "CDP endpoint must be loopback" };
+        try {
+          const probe = new URL("/json/version", options.cdpEndpoint);
+          const response = await fetch(probe, { signal: AbortSignal.timeout(1500) });
+          return { available: response.ok, detail: response.ok ? `CDP ${options.cdpEndpoint}` : `CDP HTTP ${response.status}` };
+        } catch {
+          return { available: false, detail: `CDP endpoint unavailable at ${options.cdpEndpoint}` };
+        }
+      }
       const executablePath = process.env.PI_UI_OBSERVER_CHROMIUM_PATH ?? await findChromiumExecutable();
       return executablePath ? { available: true, detail: executablePath } : { available: false, detail: "Set PI_UI_OBSERVER_CHROMIUM_PATH or install Chrome/Chromium." };
     },

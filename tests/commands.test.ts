@@ -40,12 +40,25 @@ describe("/ui commands", () => {
     expect(f.confirm).not.toHaveBeenCalled();
   });
 
+  it("fails a read tool when there is no connected browser", async () => {
+    const f = setup();
+    await expect(f.tools.get("ui_snapshot")!.execute()).rejects.toThrow("No UI adapter is connected");
+    await expect(f.tools.get("ui_screenshot")!.execute("id", {})).rejects.toThrow("No UI adapter is connected");
+  });
+
   it("exposes a responsive audit rather than a one-page capture", async () => {
     const f = setup();
     await f.handler("connect isolated http://127.0.0.1:3000", f.ctx);
     const response = await f.tools.get("ui_audit")!.execute();
     expect(response.content[0].text).toContain("viewports");
     expect(response.content[0].text).toContain("320");
+  });
+
+  it("/ui screenshot saves an image artifact", async () => {
+    const f = setup();
+    await f.handler("connect isolated http://127.0.0.1:3000", f.ctx);
+    await f.handler("screenshot", f.ctx);
+    expect(f.notify).toHaveBeenCalledWith(expect.stringContaining("Screenshot saved:"), "info");
   });
 
   it("requires explicit approval before registering current-tab MCP", async () => {

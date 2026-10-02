@@ -10,12 +10,23 @@ describe("UI evidence reports", () => {
     const root = await mkdtemp(join(tmpdir(), "ui-observer-"));
     const result = await writeArtifact("run-1", { kind: "screenshot", bytes: Buffer.from("png") }, root);
     expect(result.path).toContain("run-1");
+    expect(result.path).toMatch(/screenshot\.png$/);
     expect(JSON.parse(await readFile(result.manifestPath, "utf8"))).toMatchObject({ runId: "run-1", kind: "screenshot" });
   });
 
   it("marks missing browser evidence as a warning rather than a pass", () => {
     const audit = buildUiAudit({ snapshot: null, screenshot: null, console: [], network: [] });
     expect(audit.findings).toContainEqual(expect.objectContaining({ severity: "warn" }));
+  });
+
+  it("stores default artifacts outside the project workspace", async () => {
+    const output = await writeArtifact(`default-${Date.now()}`, { kind: "screenshot", bytes: Buffer.from("png") });
+    expect(output.path).toContain(join(tmpdir(), "pi-ui-observer"));
+  });
+
+  it("reports blocked or failed browser requests", () => {
+    const audit = buildUiAudit({ snapshot: {}, screenshot: {}, console: [], network: [{ url: "https://example.com", blocked: true }] });
+    expect(audit.findings).toContainEqual(expect.objectContaining({ severity: "warn", message: expect.stringContaining("blocked") }));
   });
 
   it("never equates capture with visual correctness", () => {

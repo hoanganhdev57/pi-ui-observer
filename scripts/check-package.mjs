@@ -9,7 +9,9 @@ if (pkg.name !== "pi-ui-observer") failures.push("package name must be pi-ui-obs
 if (!pkg.keywords?.includes("pi-package")) failures.push("package must include pi-package keyword");
 if (pkg.engines?.node !== ">=22.19.0") failures.push("Node engine must be >=22.19.0");
 for (const path of required) if (!existsSync(resolve(root, path))) failures.push(`missing Pi resource: ${path}`);
-if (!/npm publication is deferred/i.test(readFileSync(resolve(root, "README.md"), "utf8"))) failures.push("README must document npm deferral");
+const readme = readFileSync(resolve(root, "README.md"), "utf8");
+if (!readme.includes("pi install npm:pi-ui-observer@0.1.0")) failures.push("README must document pinned npm installation");
+if (!readme.includes("pi install git:github.com/hoanganhdev57/pi-ui-observer@v0.1.0")) failures.push("README must document pinned Git installation");
 if (failures.length) {
   console.error(failures.join("\n"));
   process.exit(1);

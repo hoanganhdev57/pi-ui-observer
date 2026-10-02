@@ -13,11 +13,12 @@ function createFakeExtensionApi() {
 }
 
 describe("Pi extension registration", () => {
-  it("registers read-only tools and approval-gated interaction tools", () => {
+  it("exposes only implemented read-only tools in v0.1", () => {
     const pi = createFakeExtensionApi();
     registerUiObserver(pi as never);
     expect(pi.tools.get("ui_snapshot")?.risk).toBe("read");
-    expect(pi.tools.get("ui_click")?.risk).toBe("interaction");
+    expect(pi.tools.has("ui_click")).toBe(false);
+    expect(pi.tools.has("ui_fill")).toBe(false);
     expect(pi.commands.has("ui")).toBe(true);
   });
 });
