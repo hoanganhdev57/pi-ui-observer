@@ -1,0 +1,30 @@
+{
+  "name": "pi-ui-observer",
+  "version": "0.1.0",
+  "description": "Global Pi browser UI observation and evidence-first audit tools",
+  "keywords": ["pi-package", "browser", "ui", "debugging", "mcp"],
+  "engines": { "node": ">=22.19.0" },
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "package:check": "node scripts/check-package.mjs",
+    "ci": "npm run typecheck && npm test && npm run package:check"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@sinclair/typebox": "*"
+  },
+  "devDependencies": {
+    "@sinclair/typebox": "latest",
+    "@types/node": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  },
+  "pi": {
+    "extensions": ["extensions/ui-observer.ts"],
+    "skills": ["skills"]
+  }
+}
