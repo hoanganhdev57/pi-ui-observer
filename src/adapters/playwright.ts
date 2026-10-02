@@ -1,7 +1,8 @@
-import { TransportAdapter, unavailableTransport, type AdapterTransport } from "./common.js";
+import { TransportAdapter, type AdapterTransport } from "./common.js";
+import { createPlaywrightTransport } from "./playwright-runtime.js";
 
 export class PlaywrightAdapter extends TransportAdapter {
-  constructor(transport: AdapterTransport = unavailableTransport("Playwright connector is not configured")) {
+  constructor(transport: AdapterTransport = createPlaywrightTransport()) {
     super("playwright", transport);
   }
 }

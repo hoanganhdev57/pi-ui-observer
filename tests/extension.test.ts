@@ -7,7 +7,7 @@ function createFakeExtensionApi() {
   return {
     tools,
     commands,
-    registerTool(definition: { name: string; risk?: string }) { tools.set(definition.name, { risk: definition.risk ?? "read" }); },
+    registerTool(definition: { name: string; risk?: string; execute?: (...args: unknown[]) => Promise<unknown> }) { tools.set(definition.name, definition as { risk: string }); },
     registerCommand(name: string, definition: unknown) { commands.set(name, definition); },
   };
 }

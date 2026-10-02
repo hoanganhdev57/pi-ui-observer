@@ -1,44 +1,125 @@
 import { Type } from "typebox";
+import { redactSecrets } from "./policy/redaction.js";
+import { buildUiAudit } from "./reports/audit.js";
+import { writeArtifact } from "./reports/artifacts.js";
+import type { UiSessionManager } from "./session/manager.js";
 
 interface RegistrationApi {
   registerTool(definition: Record<string, unknown>): void;
   registerCommand(name: string, definition: Record<string, unknown>): void;
+  registerMcpServer?(name: string, config: Record<string, unknown>): void;
+  unregisterMcpServer?(name: string): void;
 }
 
-const emptyParameters = Type.Object({});
+interface ToolContext {
+  ui?: { confirm?: (title: string, message: string) => Promise<boolean>; notify?: (message: string, level: string) => void };
+}
 
-function tool(name: string, description: string, risk: "read" | "interaction" | "destructive" = "read") {
-  return {
-    name,
-    label: name,
-    description,
-    parameters: emptyParameters,
-    risk,
-    async execute() {
-      return { content: [{ type: "text", text: `${name} is registered; connect a UI adapter to execute it.` }], details: { risk } };
-    },
+function result(value: unknown) {
+  const safe = redactSecrets(value);
+  const text = JSON.stringify(safe, null, 2);
+  return { content: [{ type: "text", text: text.length > 60_000 ? text.slice(0, 60_000) + "\n[TRUNCATED]" : text }], details: { preview: text.slice(0, 4_000) } };
+}
+
+export function registerUiObserver(pi: RegistrationApi, manager?: UiSessionManager): void {
+  let browserToolsConnected = false;
+  const executeRead = async (operation: (session: UiSessionManager) => Promise<unknown>) => {
+    if (!manager) return result({ error: "UI session manager is not initialized" });
+    try { return result(await operation(manager)); } catch (error) { return result({ error: error instanceof Error ? error.message : String(error) }); }
   };
-}
 
-export function registerUiObserver(pi: RegistrationApi): void {
-  for (const definition of [
-    tool("ui_current_page", "Read the current browser page."),
-    tool("ui_snapshot", "Read the accessibility and DOM snapshot."),
-    tool("ui_screenshot", "Capture a screenshot of the current UI."),
-    tool("ui_console", "Read browser console entries."),
-    tool("ui_network", "Read browser network activity."),
-    tool("ui_styles", "Read computed styles and layout for an element."),
-    tool("ui_audit", "Run a UI evidence audit."),
-    tool("ui_set_viewport", "Set the browser viewport."),
-    tool("ui_click", "Click a UI element after user approval.", "interaction"),
-    tool("ui_fill", "Fill a UI field after user approval.", "interaction"),
-    tool("ui_upload", "Upload a file after user approval.", "destructive"),
-  ]) pi.registerTool(definition);
+  const tools = [
+    { name: "ui_current_page", description: "Read the current browser page.", parameters: Type.Object({}), execute: () => executeRead((s) => s.adapter().currentPage()) },
+    { name: "ui_snapshot", description: "Read the accessibility and DOM snapshot.", parameters: Type.Object({}), execute: () => executeRead((s) => s.adapter().snapshot()) },
+    { name: "ui_screenshot", description: "Capture a screenshot of the current UI.", parameters: Type.Object({ fullPage: Type.Optional(Type.Boolean()) }), execute: async (_id: string, params: { fullPage?: boolean }) => {
+      if (!manager) return result({ error: "UI session manager is not initialized" });
+      const screenshot = await manager.adapter().screenshot(params);
+      if (!(screenshot.bytes instanceof Uint8Array)) return result({ error: "Adapter did not return PNG bytes" });
+      const artifact = await writeArtifact(`capture-${Date.now()}`, { kind: "screenshot", bytes: screenshot.bytes });
+      return { content: [
+        { type: "text", text: `Screenshot saved: ${artifact.path}` },
+        { type: "image", source: { type: "base64", mediaType: "image/png", data: Buffer.from(screenshot.bytes).toString("base64") } },
+      ], details: { path: artifact.path } };
+    } },
+    { name: "ui_console", description: "Read browser console entries.", parameters: Type.Object({}), execute: () => executeRead((s) => s.adapter().console()) },
+    { name: "ui_network", description: "Read browser network activity.", parameters: Type.Object({}), execute: () => executeRead((s) => s.adapter().network()) },
+    { name: "ui_styles", description: "Read computed styles and layout for an element.", parameters: Type.Object({ target: Type.String() }), execute: (_id: string, params: { target: string }) => executeRead((s) => s.adapter().styles(params.target)) },
+    { name: "ui_audit", description: "Run a UI evidence audit.", parameters: Type.Object({}), execute: () => executeRead(async (s) => {
+      const adapter = s.adapter();
+      const [snapshot, screenshot, consoleReport, networkReport] = await Promise.all([
+        adapter.snapshot(), adapter.screenshot(), adapter.console(), adapter.network(),
+      ]);
+      return buildUiAudit({ snapshot, screenshot, console: Array.isArray(consoleReport.entries) ? consoleReport.entries : [], network: Array.isArray(networkReport.requests) ? networkReport.requests : [] });
+    }) },
+  ];
+  for (const definition of tools) pi.registerTool({ ...definition, label: definition.name, risk: "read" });
+
+  pi.registerTool({
+    name: "ui_click",
+    label: "ui_click",
+    description: "Click a UI element after user approval.",
+    parameters: Type.Object({ target: Type.String() }),
+    risk: "interaction",
+    async execute(_id: string, params: { target: string }, _signal: AbortSignal, _update: unknown, ctx: ToolContext) {
+      const approved = await ctx.ui?.confirm?.("Approve UI click", `Click ${params.target}?`);
+      return result({ approved: Boolean(approved), message: approved ? "Click transport is not implemented for this adapter." : "Click cancelled." });
+    },
+  });
 
   pi.registerCommand("ui", {
     description: "Connect to and inspect a browser UI",
-    handler: async (args: string, ctx: { ui?: { notify?: (message: string, level: string) => void } }) => {
-      ctx.ui?.notify?.(`/ui ${args || "status"}: use the registered UI observer tools.`, "info");
+    handler: async (args: string, ctx: ToolContext) => {
+      if (!manager) return ctx.ui?.notify?.("UI session manager is not initialized.", "error");
+      const [command = "status", mode = "isolated", url] = args.trim().split(/\s+/);
+      try {
+        if (command === "connect") {
+          if (!["isolated", "chrome", "current"].includes(mode)) throw new Error("Use /ui connect isolated|chrome|current [url]");
+          if (mode !== "isolated" && !(await ctx.ui?.confirm?.("Attach browser?", `Allow pi-ui-observer to inspect your ${mode} browser session?`))) {
+            throw new Error("Browser attachment cancelled or UI confirmation unavailable");
+          }
+          if (mode === "current") {
+            if (!pi.registerMcpServer) throw new Error("This Pi version does not support native MCP registration");
+            if (browserToolsConnected) return ctx.ui?.notify?.("BrowserTools already registered. Use /mcp to check connection.", "info");
+            pi.registerMcpServer("pi-ui-browser-tools", {
+              command: process.platform === "win32" ? "cmd" : "npx",
+              args: process.platform === "win32"
+                ? ["/c", "npx", "-y", "@agentdeskai/browser-tools-mcp@2.0.2"]
+                : ["-y", "@agentdeskai/browser-tools-mcp@2.0.2"],
+              exposure: "deferred",
+              description: "Inspect the explicitly attached Chrome DevTools tab with BrowserTools",
+              toolExposure: { refreshBrowser: "hidden", getBrowserStorage: "hidden", wipeLogs: "hidden" },
+            });
+            browserToolsConnected = true;
+            return ctx.ui?.notify?.("BrowserTools MCP registered. Open DevTools in Chrome and use /mcp to check the connection; browser tools are discoverable via tool_search.", "info");
+          }
+          await manager.connect(mode as "isolated" | "chrome", { url });
+          return ctx.ui?.notify?.(`Connected to ${mode}.`, "info");
+        }
+        if (command === "disconnect") {
+          await manager.disconnect();
+          if (browserToolsConnected) { pi.unregisterMcpServer?.("pi-ui-browser-tools"); browserToolsConnected = false; }
+          return ctx.ui?.notify?.("UI adapter disconnected.", "info");
+        }
+        if (command === "status") {
+          const statuses = await manager.status();
+          const message = `Active: ${manager.active()?.adapter ?? "none"}; BrowserTools MCP: ${browserToolsConnected ? "registered (check /mcp)" : "not connected"}; ${statuses.filter((s) => s.name !== "browser-tools").map((s) => `${s.name}: ${s.available ? "ready" : s.detail ?? "unavailable"}`).join("; ")}`;
+          return ctx.ui?.notify?.(message, "info");
+        }
+        if (command === "inspect") {
+          const page = await manager.adapter().currentPage();
+          const snapshot = await manager.adapter().snapshot();
+          return ctx.ui?.notify?.(`Page: ${page.title} (${page.url}); snapshot: ${JSON.stringify(snapshot).slice(0, 1000)}`, "info");
+        }
+        if (command === "audit") {
+          const a = manager.adapter();
+          const [snapshot, screenshot, consoleReport, networkReport] = await Promise.all([a.snapshot(), a.screenshot(), a.console(), a.network()]);
+          const audit = buildUiAudit({ snapshot, screenshot, console: Array.isArray(consoleReport.entries) ? consoleReport.entries : [], network: Array.isArray(networkReport.requests) ? networkReport.requests : [] });
+          return ctx.ui?.notify?.(`UI audit: ${audit.findings.map((finding) => `${finding.severity.toUpperCase()} ${finding.message}`).join("; ")}`, "info");
+        }
+        return ctx.ui?.notify?.(`Unknown command: ${command}. Use status|connect|disconnect|inspect|audit.`, "error");
+      } catch (error) {
+        return ctx.ui?.notify?.(error instanceof Error ? error.message : String(error), "error");
+      }
     },
   });
 }

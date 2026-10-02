@@ -4,7 +4,7 @@ Global Pi tools for inspecting and verifying web UIs with browser evidence.
 
 ## Status
 
-This package is under active development. The first release targets GitHub and the Pi package gallery. npm publication is deferred.
+This package is under active development and **not released**. GitHub installation will be available after the runtime and security gates pass. npm publication is deferred; Pi's package gallery documents `pi-package` discovery for npm packages, so a GitHub-only repository is not assumed to appear there.
 
 ## Planned installation
 
@@ -21,7 +21,7 @@ After installation, start Pi in any web project and use:
 /ui audit
 ```
 
-The package will support isolated Playwright sessions, Chrome DevTools runtime inspection, and the current-tab BrowserTools connector. Read-only observation is the default; browser interactions require approval.
+The package is being developed with direct isolated Playwright and loopback Chrome CDP modes. `/ui connect current` requires explicit approval and registers BrowserTools MCP 2.0.2 through Pi's native MCP client; it requires the BrowserTools Chrome extension and an open DevTools tab. Its tools are exposed through Pi's MCP tool discovery, not the `ui_*` adapter. Read-only observation is the default; browser interactions are not yet implemented. Do not use this development snapshot as a security boundary for sensitive production sessions.
 
 ## Security
 

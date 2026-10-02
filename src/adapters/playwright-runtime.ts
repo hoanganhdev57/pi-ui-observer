@@ -1,0 +1,113 @@
+import { access } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { chromium, type Browser, type BrowserContext, type Page } from "playwright-core";
+import { defaultHostPolicy, isAllowedHost } from "../policy/hosts.js";
+import type { ConnectOptions } from "./adapter.js";
+import type { AdapterTransport } from "./common.js";
+
+interface RuntimeOptions {
+  cdpEndpoint?: string;
+}
+
+export function createPlaywrightTransport(options: RuntimeOptions = {}): AdapterTransport {
+  let browser: Browser | undefined;
+  let context: BrowserContext | undefined;
+  let page: Page | undefined;
+  let connectedAllowedHosts: string[] = [];
+  const consoleEntries: Record<string, unknown>[] = [];
+  const networkEntries: Record<string, unknown>[] = [];
+
+  return {
+    async status() {
+      if (options.cdpEndpoint) return { available: true, detail: `CDP ${options.cdpEndpoint}` };
+      const executablePath = process.env.PI_UI_OBSERVER_CHROMIUM_PATH ?? await findChromiumExecutable();
+      return executablePath ? { available: true, detail: executablePath } : { available: false, detail: "Set PI_UI_OBSERVER_CHROMIUM_PATH or install Chrome/Chromium." };
+    },
+    async connect(connectOptions: ConnectOptions) {
+      connectedAllowedHosts = connectOptions.allowedHosts ?? [];
+      const policy = { ...defaultHostPolicy, allowedHosts: connectedAllowedHosts };
+      if (connectOptions.url && !isAllowedHost(connectOptions.url, policy)) {
+        throw Object.assign(new Error("Page URL is not allowed by host policy"), { code: "HOST_NOT_ALLOWED" });
+      }
+      if (options.cdpEndpoint && !isAllowedHost(options.cdpEndpoint, defaultHostPolicy)) {
+        throw Object.assign(new Error("CDP endpoint must be loopback"), { code: "HOST_NOT_ALLOWED" });
+      }
+      if (options.cdpEndpoint) {
+        browser = await chromium.connectOverCDP(options.cdpEndpoint);
+        context = browser.contexts()[0] ?? await browser.newContext();
+        page = context.pages()[0] ?? await context.newPage();
+      } else {
+        const executablePath = process.env.PI_UI_OBSERVER_CHROMIUM_PATH ?? await findChromiumExecutable();
+        if (!executablePath) throw Object.assign(new Error("No Chrome/Chromium executable found"), { code: "ADAPTER_UNAVAILABLE" });
+        browser = await chromium.launch({ headless: true, executablePath });
+        context = await browser.newContext({ viewport: connectOptions.viewport });
+        page = await context.newPage();
+      }
+      attachListeners(page);
+      if (options.cdpEndpoint && !isAllowedHost(page.url(), policy)) {
+        await browser.close();
+        browser = undefined;
+        page = undefined;
+        throw Object.assign(new Error("Attached tab is not allowed by host policy"), { code: "HOST_NOT_ALLOWED" });
+      }
+      if (connectOptions.url) await page.goto(connectOptions.url, { waitUntil: "domcontentloaded" });
+      return { id: `playwright-${Date.now()}` };
+    },
+    async disconnect() {
+      if (browser) await browser.close();
+      browser = undefined;
+      context = undefined;
+      page = undefined;
+    },
+    async call(method, params = {}) {
+      if (!page) throw Object.assign(new Error("Playwright is not connected"), { code: "NOT_CONNECTED" });
+      if (!isAllowedHost(page.url(), { ...defaultHostPolicy, allowedHosts: connectedAllowedHosts })) {
+        throw Object.assign(new Error("Current page left the allowed hosts"), { code: "HOST_NOT_ALLOWED" });
+      }
+      if (method === "currentPage") return { url: page.url(), title: await page.title(), viewport: page.viewportSize() };
+      if (method === "snapshot") return page.evaluate(() => ({
+        text: document.body?.innerText ?? "",
+        nodes: Array.from(document.querySelectorAll("button,a,input,select,textarea,[role]"), (element) => ({
+          tag: element.tagName.toLowerCase(),
+          role: element.getAttribute("role"),
+          name: (element.getAttribute("aria-label") || element.textContent || "").trim().slice(0, 200),
+          testId: element.getAttribute("data-testid"),
+          visible: Boolean((element as HTMLElement).offsetWidth || (element as HTMLElement).offsetHeight),
+        })),
+      }));
+      if (method === "screenshot") return { kind: "screenshot", bytes: await page.screenshot({ fullPage: Boolean(params.fullPage) }) };
+      if (method === "console") return { entries: [...consoleEntries] };
+      if (method === "network") return { requests: [...networkEntries] };
+      if (method === "styles") return page.evaluate((selector) => {
+        const element = document.querySelector(String(selector));
+        if (!element) return { found: false };
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return { found: true, display: style.display, visibility: style.visibility, overflow: style.overflow, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } };
+      }, params.target ?? "body");
+      if (method === "audit") return { console: consoleEntries, network: networkEntries, page: await page.title() };
+      throw new Error(`Unsupported Playwright method: ${method}`);
+    },
+  };
+
+  function attachListeners(target: Page): void {
+    target.on("console", (message) => consoleEntries.push({ level: message.type(), text: message.text() }));
+    target.on("pageerror", (error) => consoleEntries.push({ level: "error", text: error.message }));
+    target.on("requestfailed", (request) => networkEntries.push({ url: request.url(), method: request.method(), failure: request.failure()?.errorText }));
+    target.on("response", (response) => { if (response.status() >= 400) networkEntries.push({ url: response.url(), status: response.status(), method: response.request().method() }); });
+  }
+}
+
+async function findChromiumExecutable(): Promise<string | undefined> {
+  const candidates = process.platform === "win32"
+    ? [join(process.env.LOCALAPPDATA ?? "", "Google", "Chrome", "Application", "chrome.exe"), join(process.env.PROGRAMFILES ?? "", "Google", "Chrome", "Application", "chrome.exe"), join(process.env.PROGRAMFILES ?? "", "Microsoft", "Edge", "Application", "msedge.exe")]
+    : process.platform === "darwin"
+      ? ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"]
+      : ["/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"];
+  for (const candidate of candidates) {
+    if (candidate && await access(candidate).then(() => true, () => false)) return candidate;
+  }
+  const homeCandidate = join(homedir(), ".cache", "ms-playwright");
+  return await access(homeCandidate).then(() => undefined, () => undefined);
+}

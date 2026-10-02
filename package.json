@@ -12,13 +12,14 @@
     "package:check": "node scripts/check-package.mjs",
     "ci": "npm run typecheck && npm test && npm run package:check"
   },
-  "dependencies": {},
+  "dependencies": {
+    "playwright-core": "latest"
+  },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
-    "@sinclair/typebox": "*"
+    "typebox": "*"
   },
   "devDependencies": {
-    "@sinclair/typebox": "latest",
     "@types/node": "latest",
     "typebox": "latest",
     "typescript": "latest",
