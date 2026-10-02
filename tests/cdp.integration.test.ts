@@ -12,7 +12,7 @@ import { createPlaywrightTransport } from "../src/adapters/playwright-runtime.js
 
 const chromePath = process.env.PI_UI_OBSERVER_CHROMIUM_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe";
 
-it.skipIf(!existsSync(chromePath))("attaches to the existing approved CDP tab, not about:blank", async () => {
+it.skipIf(!existsSync(chromePath) || process.env.PI_UI_OBSERVER_RUN_CDP_E2E !== "1")("attaches to the existing approved CDP tab, not about:blank", async () => {
   const probe = createServer();
   probe.listen(0, "127.0.0.1");
   await once(probe, "listening");
