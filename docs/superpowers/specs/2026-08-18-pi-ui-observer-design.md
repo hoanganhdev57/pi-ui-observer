@@ -9,7 +9,8 @@ Build a global Pi package that lets Pi inspect and verify any web UI through scr
 ## Distribution
 
 - Package name: `pi-ui-observer`.
-- First distribution: public GitHub repository and Pi package gallery metadata.
+- First distribution: public GitHub repository with Pi package metadata and Git install support.
+- Pi package gallery eligibility is documented for npm packages with the `pi-package` keyword; GitHub-only indexing is not promised. Gallery listing is deferred until npm publication and verification.
 - npm publication is deferred until the user can register/publish an npm package.
 - Intended install form: `pi install git:<github-owner>/pi-ui-observer`.
 - Package manifest includes the `pi-package` keyword and Pi resource entries.
@@ -208,6 +209,6 @@ pi-ui-observer/
 2. Add package, docs, tests, CI, and security policy.
 3. Run local package and Pi resource checks.
 4. Push repository and create a version tag/release.
-5. Confirm Pi package gallery discovers the `pi-package` metadata.
-6. Install from GitHub in a clean Pi environment.
-7. Publish npm later without changing the package resource contract.
+5. Install from GitHub in a clean Pi environment.
+6. Publish npm later without changing the package resource contract.
+7. Confirm Pi package gallery listing only after npm publication and observed indexing.

@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Package name is `pi-ui-observer`.
-- First distribution is a public GitHub repository and Pi package gallery metadata; npm publication is deferred.
+- First distribution is a public GitHub repository with Pi package metadata and Git install support; npm publication and verified Pi package gallery listing are deferred.
 - The package is global and must not contain Anime2x-specific selectors, routes, copy, or assumptions.
 - V1 supports Playwright, Chrome DevTools, and BrowserTools adapters.
 - Read-only observation is the default.
@@ -518,7 +518,7 @@ git add extensions src/commands.ts scripts tests/watch.test.ts README.md SECURIT
 
 ---
 
-### Task 7: Validate GitHub installation and publish to Pi package gallery
+### Task 7: Validate GitHub installation and publish a GitHub release
 
 **Files:**
 - Modify: `README.md` only if installation validation finds inaccurate instructions.
@@ -570,9 +570,9 @@ git push origin main v0.1.0
 gh release create v0.1.0 --title "pi-ui-observer v0.1.0" --generate-notes
 ```
 
-- [ ] **Step 5: Confirm Pi gallery metadata**
+- [ ] **Step 5: Record Pi gallery deferral**
 
-Open the Pi package gallery and confirm the public repository is discoverable by the `pi-package` keyword, package name, README, and resource metadata. Record the gallery URL and installation command in the final report. If indexing is asynchronous, report the GitHub release as the available installation source and do not claim gallery visibility until observed.
+The Pi package documentation only confirms `pi-package` gallery eligibility for npm packages. Document GitHub installation as the available source and state that gallery listing will be checked after npm publication. Do not claim gallery visibility from a GitHub-only release.
 
 - [ ] **Step 6: Final release verification**
 
