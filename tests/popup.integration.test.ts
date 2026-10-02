@@ -8,7 +8,7 @@ import type { Page } from "playwright-core";
 
 const chromePath = process.env.PI_UI_OBSERVER_CHROMIUM_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe";
 
-it.skipIf(!existsSync(chromePath)).each(["direct", "redirect"])("blocks a %s popup to a non-allowlisted host", async (scenario) => {
+it.skipIf(!existsSync(chromePath)).each(["direct", "redirect", "about-blank"])("blocks a %s popup to a non-allowlisted host", async (scenario) => {
   let received = 0;
   const destination = createServer((_req, res) => { received++; res.end("leaked"); });
   destination.listen(0, "127.0.0.2");
@@ -23,9 +23,7 @@ it.skipIf(!existsSync(chromePath)).each(["direct", "redirect"])("blocks a %s pop
     }
     res.setHeader("Content-Type", "text/html");
     const popup = scenario === "redirect" ? "/redirect" : `http://127.0.0.2:${target.port}/popup`;
-    const action = scenario === "blank-fetch"
-      ? `window.open('about:blank')`
-      : `window.open('${popup}')`;
+    const action = scenario === "about-blank" ? "window.open('about:blank')" : `window.open('${popup}')`;
     res.end(`<button onclick="${action}">Open popup</button>`);
   });
   source.listen(0, "127.0.0.1");

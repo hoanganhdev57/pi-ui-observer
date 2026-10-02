@@ -11,4 +11,5 @@ it("does not choose an unrelated localhost tab when an exact URL was requested",
   expect(selectAllowedPage(pages, "http://127.0.0.1:4000/")).toBe(pages[1]);
   expect(selectAllowedPage(pages, "http://127.0.0.1:5000/")).toBeUndefined();
   expect(selectAllowedPage(pages, "http://127.0.0.1:4000")).toBe(pages[1]);
+  expect(selectAllowedPage(pages, "http://127.0.0.1:4000/#section")).toBe(pages[1]);
 });

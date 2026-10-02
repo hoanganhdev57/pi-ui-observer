@@ -11,10 +11,16 @@ interface RuntimeOptions {
   onPage?: (page: Page) => void;
 }
 
+function documentUrl(raw: string): string {
+  const url = new URL(raw);
+  url.hash = "";
+  return url.href;
+}
+
 export function selectAllowedPage<T extends { url(): string }>(pages: T[], requestedUrl?: string, allowedHosts: string[] = []): T | undefined {
   const policy = { ...defaultHostPolicy, allowedHosts };
-  const normalizedRequested = requestedUrl ? new URL(requestedUrl).href : undefined;
-  return pages.find((candidate) => isAllowedHost(candidate.url(), policy) && (!normalizedRequested || new URL(candidate.url()).href === normalizedRequested));
+  const normalizedRequested = requestedUrl ? documentUrl(requestedUrl) : undefined;
+  return pages.find((candidate) => isAllowedHost(candidate.url(), policy) && (!normalizedRequested || documentUrl(candidate.url()) === normalizedRequested));
 }
 
 export function createPlaywrightTransport(options: RuntimeOptions = {}): AdapterTransport {
@@ -73,7 +79,7 @@ export function createPlaywrightTransport(options: RuntimeOptions = {}): Adapter
         await context.route("**/*", async (route) => {
           const request = route.request();
           const target = request.url();
-          const initialNavigation = initialNavigationPending && connectOptions.url !== undefined && new URL(target).href === new URL(connectOptions.url).href;
+          const initialNavigation = initialNavigationPending && connectOptions.url !== undefined && documentUrl(target) === documentUrl(connectOptions.url);
           if (request.isNavigationRequest()) {
             if (initialNavigation) initialNavigationPending = false;
             else {
@@ -90,6 +96,12 @@ export function createPlaywrightTransport(options: RuntimeOptions = {}): Adapter
           await route.continue();
         });
         page = await context.newPage();
+        context.on("page", (popup) => {
+          if (popup === page) return;
+          const target = popup.url();
+          networkEntries.push({ url: target || "about:blank", method: "GET", blocked: true, reason: "New popup pages are disabled in isolated read-only mode" });
+          void popup.close().catch((error: unknown) => consoleEntries.push({ level: "error", text: `Popup close failed: ${String(error)}` }));
+        });
         isolatedFetchSession = await context.newCDPSession(page);
         isolatedFetchSession.on("Fetch.requestPaused", (event) => {
           const target = event.request.url;
@@ -104,7 +116,7 @@ export function createPlaywrightTransport(options: RuntimeOptions = {}): Adapter
       }
       attachListeners(page);
       options.onPage?.(page);
-      if (connectOptions.url && new URL(page.url()).href !== new URL(connectOptions.url).href) await page.goto(connectOptions.url, { waitUntil: "domcontentloaded" });
+      if (connectOptions.url && documentUrl(page.url()) !== documentUrl(connectOptions.url)) await page.goto(connectOptions.url, { waitUntil: "domcontentloaded" });
       return { id: `playwright-${Date.now()}` };
     },
     async disconnect() {
