@@ -215,3 +215,18 @@ pi-ui-observer/
 ## Approved read-only v0.1 release amendment
 
 The user approved a smaller first public release on 2026-10-02: read-only browser observation on isolated Playwright and approved loopback CDP sessions, with BrowserTools 2.0.2 registered through Pi native MCP only after explicit approval. Provide screenshot/ARIA+DOM snapshot/console/network/styles, responsive overflow measurements at five widths in isolated mode, and a skill that instructs the agent to compare evidence against design intent. Artifacts default to the user temporary directory. The audit must not equate captured evidence with design correctness. No action tools, watch mode, automated design verdict, or WebView2 support ship in v0.1; the earlier tool and feature lists remain later-phase design intent. Publish npm and GitHub only after clean-install tests, independent review, and CI. Gallery eligibility is not proof of listing; verify the listing after npm publication.
+
+## v0.2 backlog: artifact lifecycle and disk hygiene
+
+The published v0.1 may leave screenshot artifacts and `manifest.json` files in a private `pi-ui-observer-*` directory under the system temporary directory. This is intentional evidence preservation, but v0.1 does not automatically remove those artifacts on `/ui disconnect`.
+
+The v0.2 requirements must add:
+
+- automatic cleanup on disconnect/session completion, with cleanup errors reported without masking the observation result;
+- a bounded retention policy and total-size cap for artifacts;
+- an explicit `/ui cleanup` command for manual cleanup;
+- a documented retention option for users who need to review evidence after the session;
+- tests proving cleanup of screenshots/manifests, safe handling of missing or already-removed directories, and no deletion outside the package-owned artifact root;
+- documentation that screenshots can contain private page data and that retention/cleanup behavior is configurable.
+
+This backlog item is separate from v0.1 and must not retroactively change or invalidate the published v0.1 artifact paths.

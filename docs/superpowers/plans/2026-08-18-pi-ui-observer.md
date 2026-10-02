@@ -599,3 +599,17 @@ This amendment overrides full-v1 items not shipped in v0.1. Publish only read-on
 - [ ] Tag and release `v0.1.0` only after CI passes, then verify Git installation in an isolated Pi config.
 - [ ] Verify `npm whoami`, run `npm publish --dry-run`, publish unscoped `pi-ui-observer@0.1.0 --access public`, and verify registry metadata plus installation in an isolated Pi config.
 - [ ] Visit `https://pi.dev/packages` to check actual listing. If indexing is delayed, report npm availability without claiming gallery visibility.
+
+## v0.2 backlog: artifact cleanup and retention
+
+The v0.1 release writes screenshots and manifests beneath a private system-temp `pi-ui-observer-*` root but does not remove them on disconnect. Before planning v0.2, consolidate this backlog with other post-release findings.
+
+- [ ] Add owned-root cleanup on disconnect/session completion.
+- [ ] Add bounded retention and total artifact-size limits.
+- [ ] Add `/ui cleanup` for explicit manual cleanup.
+- [ ] Preserve an opt-in retention mode for evidence review.
+- [ ] Report cleanup failures without hiding the original audit result.
+- [ ] Add tests for successful cleanup, missing roots, repeated cleanup, and path-boundary safety.
+- [ ] Update README/SECURITY with retention defaults, sensitive screenshot handling, and manual cleanup guidance.
+
+Do not backport this behavior into the published v0.1.0 tag; implement it in the next release after the broader issue backlog is consolidated.
