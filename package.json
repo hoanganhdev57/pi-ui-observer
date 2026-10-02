@@ -20,6 +20,7 @@
   "devDependencies": {
     "@sinclair/typebox": "latest",
     "@types/node": "latest",
+    "typebox": "latest",
     "typescript": "latest",
     "vitest": "latest"
   },
