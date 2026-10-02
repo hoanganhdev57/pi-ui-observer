@@ -42,6 +42,15 @@ export function createPlaywrightTransport(options: RuntimeOptions = {}): Adapter
         if (!executablePath) throw Object.assign(new Error("No Chrome/Chromium executable found"), { code: "ADAPTER_UNAVAILABLE" });
         browser = await chromium.launch({ headless: true, executablePath });
         context = await browser.newContext({ viewport: connectOptions.viewport });
+        await context.route("**/*", async (route) => {
+          const target = route.request().url();
+          if (!isAllowedHost(target, policy) && !/^(?:data|blob|about):/.test(target)) {
+            networkEntries.push({ url: target, method: route.request().method(), blocked: true });
+            await route.abort("blockedbyclient");
+            return;
+          }
+          await route.continue();
+        });
         page = await context.newPage();
       }
       attachListeners(page);
@@ -66,16 +75,22 @@ export function createPlaywrightTransport(options: RuntimeOptions = {}): Adapter
         throw Object.assign(new Error("Current page left the allowed hosts"), { code: "HOST_NOT_ALLOWED" });
       }
       if (method === "currentPage") return { url: page.url(), title: await page.title(), viewport: page.viewportSize() };
-      if (method === "snapshot") return page.evaluate(() => ({
-        text: document.body?.innerText ?? "",
-        nodes: Array.from(document.querySelectorAll("button,a,input,select,textarea,[role]"), (element) => ({
-          tag: element.tagName.toLowerCase(),
-          role: element.getAttribute("role"),
-          name: (element.getAttribute("aria-label") || element.textContent || "").trim().slice(0, 200),
-          testId: element.getAttribute("data-testid"),
-          visible: Boolean((element as HTMLElement).offsetWidth || (element as HTMLElement).offsetHeight),
-        })),
-      }));
+      if (method === "snapshot") {
+        const [accessibilityTree, dom] = await Promise.all([
+          page.ariaSnapshot(),
+          page.evaluate(() => ({
+            text: (document.body?.innerText ?? "").slice(0, 30_000),
+            nodes: Array.from(document.querySelectorAll("button,a,input,select,textarea,[role]"), (element) => ({
+              tag: element.tagName.toLowerCase(),
+              role: element.getAttribute("role"),
+              name: (element.getAttribute("aria-label") || element.textContent || "").trim().slice(0, 200),
+              testId: element.getAttribute("data-testid"),
+              visible: Boolean((element as HTMLElement).offsetWidth || (element as HTMLElement).offsetHeight),
+            })).slice(0, 500),
+          })),
+        ]);
+        return { accessibilityTree: accessibilityTree.slice(0, 30_000), ...dom };
+      }
       if (method === "screenshot") return { kind: "screenshot", bytes: await page.screenshot({ fullPage: Boolean(params.fullPage) }) };
       if (method === "console") return { entries: [...consoleEntries] };
       if (method === "network") return { requests: [...networkEntries] };
@@ -86,7 +101,21 @@ export function createPlaywrightTransport(options: RuntimeOptions = {}): Adapter
         const rect = element.getBoundingClientRect();
         return { found: true, display: style.display, visibility: style.visibility, overflow: style.overflow, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } };
       }, params.target ?? "body");
-      if (method === "audit") return { console: consoleEntries, network: networkEntries, page: await page.title() };
+      if (method === "setViewport") {
+        const width = Number(params.width);
+        const height = Number(params.height);
+        if (!Number.isInteger(width) || width < 240 || width > 3840 || !Number.isInteger(height) || height < 240 || height > 3840) throw new Error("Viewport must be integer pixels within 240..3840");
+        await page.setViewportSize({ width, height });
+        return { viewport: page.viewportSize() };
+      }
+      if (method === "audit") {
+        const layout = await page.evaluate(() => ({
+          viewportWidth: document.documentElement.clientWidth,
+          documentWidth: document.documentElement.scrollWidth,
+          horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+        }));
+        return { console: [...consoleEntries], network: [...networkEntries], page: await page.title(), viewport: page.viewportSize(), ...layout };
+      }
       throw new Error(`Unsupported Playwright method: ${method}`);
     },
   };

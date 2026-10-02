@@ -14,6 +14,7 @@ function fakeAdapter(name: string, available = true): UiAdapter {
     async console() { return { entries: [] }; },
     async network() { return { requests: [] }; },
     async styles() { return { target: "body" }; },
+    async setViewport() { return { viewport: { width: 320, height: 700 } }; },
     async audit() { return { findings: [] }; },
   };
 }

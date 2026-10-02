@@ -5,6 +5,7 @@ import { UiSessionManager } from "../src/session/manager.js";
 
 function setup() {
   const commands = new Map<string, { handler(args: string, ctx: unknown): Promise<void> }>();
+  const tools = new Map<string, { execute(...args: unknown[]): Promise<{ content: Array<{ type: string; text?: string }> }> }>();
   const registerMcpServer = vi.fn();
   const unregisterMcpServer = vi.fn();
   const adapter: UiAdapter = {
@@ -18,16 +19,17 @@ function setup() {
     console: async () => ({ entries: [] }),
     network: async () => ({ requests: [] }),
     styles: async () => ({ found: true }),
+    setViewport: async (viewport) => ({ viewport }),
     audit: async () => ({ findings: [] }),
   };
   const registry = new AdapterRegistry();
   registry.register("playwright", () => adapter);
   const manager = new UiSessionManager(registry);
-  registerUiObserver({ registerTool() {}, registerCommand(name, command) { commands.set(name, command as never); }, registerMcpServer, unregisterMcpServer }, manager);
+  registerUiObserver({ registerTool(tool) { tools.set(String(tool.name), tool as never); }, registerCommand(name, command) { commands.set(name, command as never); }, registerMcpServer, unregisterMcpServer }, manager);
   const notify = vi.fn();
   const confirm = vi.fn().mockResolvedValue(true);
   const ctx = { ui: { notify, confirm } };
-  return { handler: commands.get("ui")!.handler, manager, registerMcpServer, unregisterMcpServer, notify, confirm, ctx };
+  return { handler: commands.get("ui")!.handler, tools, manager, registerMcpServer, unregisterMcpServer, notify, confirm, ctx };
 }
 
 describe("/ui commands", () => {
@@ -36,6 +38,14 @@ describe("/ui commands", () => {
     await f.handler("connect isolated http://127.0.0.1:3000", f.ctx);
     expect(f.manager.active()?.adapter).toBe("playwright");
     expect(f.confirm).not.toHaveBeenCalled();
+  });
+
+  it("exposes a responsive audit rather than a one-page capture", async () => {
+    const f = setup();
+    await f.handler("connect isolated http://127.0.0.1:3000", f.ctx);
+    const response = await f.tools.get("ui_audit")!.execute();
+    expect(response.content[0].text).toContain("viewports");
+    expect(response.content[0].text).toContain("320");
   });
 
   it("requires explicit approval before registering current-tab MCP", async () => {

@@ -1,6 +1,6 @@
 import { Type } from "typebox";
 import { redactSecrets } from "./policy/redaction.js";
-import { buildUiAudit } from "./reports/audit.js";
+import { collectAudit } from "./reports/collect.js";
 import { writeArtifact } from "./reports/artifacts.js";
 import type { UiSessionManager } from "./session/manager.js";
 
@@ -44,13 +44,7 @@ export function registerUiObserver(pi: RegistrationApi, manager?: UiSessionManag
     { name: "ui_console", description: "Read browser console entries.", parameters: Type.Object({}), execute: () => executeRead((s) => s.adapter().console()) },
     { name: "ui_network", description: "Read browser network activity.", parameters: Type.Object({}), execute: () => executeRead((s) => s.adapter().network()) },
     { name: "ui_styles", description: "Read computed styles and layout for an element.", parameters: Type.Object({ target: Type.String() }), execute: (_id: string, params: { target: string }) => executeRead((s) => s.adapter().styles(params.target)) },
-    { name: "ui_audit", description: "Run a UI evidence audit.", parameters: Type.Object({}), execute: () => executeRead(async (s) => {
-      const adapter = s.adapter();
-      const [snapshot, screenshot, consoleReport, networkReport] = await Promise.all([
-        adapter.snapshot(), adapter.screenshot(), adapter.console(), adapter.network(),
-      ]);
-      return buildUiAudit({ snapshot, screenshot, console: Array.isArray(consoleReport.entries) ? consoleReport.entries : [], network: Array.isArray(networkReport.requests) ? networkReport.requests : [] });
-    }) },
+    { name: "ui_audit", description: "Capture browser evidence and check responsive overflow.", parameters: Type.Object({}), execute: () => executeRead((s) => collectAudit(s.adapter(), { responsive: s.active()?.mode === "isolated" })) },
   ];
   for (const definition of tools) pi.registerTool({ ...definition, label: definition.name, risk: "read" });
 
@@ -111,9 +105,7 @@ export function registerUiObserver(pi: RegistrationApi, manager?: UiSessionManag
           return ctx.ui?.notify?.(`Page: ${page.title} (${page.url}); snapshot: ${JSON.stringify(snapshot).slice(0, 1000)}`, "info");
         }
         if (command === "audit") {
-          const a = manager.adapter();
-          const [snapshot, screenshot, consoleReport, networkReport] = await Promise.all([a.snapshot(), a.screenshot(), a.console(), a.network()]);
-          const audit = buildUiAudit({ snapshot, screenshot, console: Array.isArray(consoleReport.entries) ? consoleReport.entries : [], network: Array.isArray(networkReport.requests) ? networkReport.requests : [] });
+          const audit = await collectAudit(manager.adapter(), { responsive: manager.active()?.mode === "isolated" });
           return ctx.ui?.notify?.(`UI audit: ${audit.findings.map((finding) => `${finding.severity.toUpperCase()} ${finding.message}`).join("; ")}`, "info");
         }
         return ctx.ui?.notify?.(`Unknown command: ${command}. Use status|connect|disconnect|inspect|audit.`, "error");

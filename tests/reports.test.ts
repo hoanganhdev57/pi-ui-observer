@@ -17,4 +17,10 @@ describe("UI evidence reports", () => {
     const audit = buildUiAudit({ snapshot: null, screenshot: null, console: [], network: [] });
     expect(audit.findings).toContainEqual(expect.objectContaining({ severity: "warn" }));
   });
+
+  it("never equates capture with visual correctness", () => {
+    const audit = buildUiAudit({ snapshot: { nodes: [] }, screenshot: { bytes: Buffer.from("png") }, console: [], network: [] });
+    expect(audit.findings).not.toContainEqual(expect.objectContaining({ severity: "pass" }));
+    expect(audit.findings).toContainEqual(expect.objectContaining({ severity: "warn", message: expect.stringContaining("review") }));
+  });
 });

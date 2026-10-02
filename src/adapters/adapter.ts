@@ -23,6 +23,7 @@ export interface UiAdapter {
   console(options?: Record<string, unknown>): Promise<Record<string, unknown>>;
   network(options?: Record<string, unknown>): Promise<Record<string, unknown>>;
   styles(target: string): Promise<Record<string, unknown>>;
+  setViewport(viewport: { width: number; height: number }): Promise<Record<string, unknown>>;
   audit(options?: Record<string, unknown>): Promise<Record<string, unknown>>;
 }
 

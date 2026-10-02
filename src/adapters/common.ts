@@ -30,6 +30,7 @@ export class TransportAdapter implements UiAdapter {
   console(options?: Record<string, unknown>) { return this.transport.call("console", options); }
   network(options?: Record<string, unknown>) { return this.transport.call("network", options); }
   styles(target: string) { return this.transport.call("styles", { target }); }
+  setViewport(viewport: { width: number; height: number }) { return this.transport.call("setViewport", viewport); }
   audit(options?: Record<string, unknown>) { return this.transport.call("audit", options); }
 }
 
