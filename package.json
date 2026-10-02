@@ -1,0 +1,42 @@
+{
+  "name": "pi-ui-observer",
+  "version": "0.1.0",
+  "description": "Global Pi browser UI observation and evidence-first audit tools",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/hoanganhdev57/pi-ui-observer.git" },
+  "homepage": "https://github.com/hoanganhdev57/pi-ui-observer#readme",
+  "bugs": { "url": "https://github.com/hoanganhdev57/pi-ui-observer/issues" },
+  "files": ["extensions", "skills", "src", "README.md", "SECURITY.md", "LICENSE"],
+  "keywords": ["pi-package", "browser", "ui", "debugging", "mcp"],
+  "engines": { "node": ">=22.19.0" },
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "package:check": "node scripts/check-package.mjs",
+    "ci": "npm run typecheck && npm test && npm run package:check"
+  },
+  "dependencies": {
+    "playwright-core": "^1.63.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": { "optional": true },
+    "typebox": { "optional": true }
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^1.0.0",
+    "@types/node": "latest",
+    "typebox": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  },
+  "pi": {
+    "extensions": ["extensions/ui-observer.ts"],
+    "skills": ["skills"]
+  }
+}

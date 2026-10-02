@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Package name is `pi-ui-observer`.
-- First distribution is a public GitHub repository with Pi package metadata and Git install support; npm publication and verified Pi package gallery listing are deferred.
+- The approved read-only v0.1 amendment at the end of this plan supersedes the original full-v1 scope. Publish v0.1 to GitHub and npm after checks; gallery listing requires observed indexing.
 - The package is global and must not contain Anime2x-specific selectors, routes, copy, or assumptions.
 - V1 supports Playwright, Chrome DevTools, and BrowserTools adapters.
 - Read-only observation is the default.
@@ -20,7 +20,7 @@
 - Cookies, authorization headers, JWTs, API keys, and similar secrets must be redacted.
 - Isolated browser mode is the default.
 - Default responsive viewports are 1280x720, 768x900, 414x896, 375x812, and 320x700.
-- No npm publication occurs until an npm identity is available.
+- npm identity is available and must be confirmed with `npm whoami` before publication.
 - Do not add telemetry.
 
 ---
@@ -527,7 +527,7 @@ git add extensions src/commands.ts scripts tests/watch.test.ts README.md SECURIT
 **Interfaces:**
 - Produces a public GitHub repository with a tagged package release.
 - Produces a clean `pi install git:<owner>/pi-ui-observer` smoke-test result.
-- Does not publish npm.
+- Publishes GitHub first; npm publication follows clean install and CI checks.
 
 - [ ] **Step 1: Run final local verification**
 
@@ -584,4 +584,18 @@ git log -5 --oneline
 gh release view v0.1.0
 ```
 
-Expected: clean source tree, tagged release visible, and installation path documented. npm remains unpublished by design.
+Expected: clean source tree, tagged GitHub release visible, and installation path documented; then follow the npm release amendment below.
+
+## Approved read-only v0.1 + npm amendment (2026-10-02)
+
+This amendment overrides full-v1 items not shipped in v0.1. Publish only read-only observer tools, isolated Playwright and approved loopback CDP, optional BrowserTools native MCP after consent, semantic snapshot, screenshot, computed styles, console/network, and five-width responsive overflow audit. Do not expose placeholder click/fill/upload tools or watch commands; design-aware comparison is guided by the skill, not an automated verdict. Screenshots use a private temporary directory.
+
+### Release gates
+
+- [ ] Run `npm run ci`, `npm audit --omit=dev`, `git diff --check`, and `npm pack --dry-run`; inspect the tarball file list for only intended runtime files.
+- [ ] Run a local Pi RPC smoke test in an isolated `PI_CODING_AGENT_DIR` and confirm `/ui` registration without writing user settings.
+- [ ] Obtain read-only independent review and fix release blockers.
+- [ ] Merge the feature branch into main, push the public GitHub repository, and verify CI on both Ubuntu and Windows.
+- [ ] Tag and release `v0.1.0` only after CI passes, then verify Git installation in an isolated Pi config.
+- [ ] Verify `npm whoami`, run `npm publish --dry-run`, publish unscoped `pi-ui-observer@0.1.0 --access public`, and verify registry metadata plus installation in an isolated Pi config.
+- [ ] Visit `https://pi.dev/packages` to check actual listing. If indexing is delayed, report npm availability without claiming gallery visibility.

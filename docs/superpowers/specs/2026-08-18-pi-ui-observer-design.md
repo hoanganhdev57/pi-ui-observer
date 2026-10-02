@@ -1,6 +1,6 @@
 # pi-ui-observer Global Package
 
-**Status:** Design approved by user; implementation not started.
+**Status:** Design approved. Read-only v0.1 release scope approved separately; the broader v1 feature list below remains a roadmap.
 
 ## Goal
 
@@ -10,9 +10,8 @@ Build a global Pi package that lets Pi inspect and verify any web UI through scr
 
 - Package name: `pi-ui-observer`.
 - First distribution: public GitHub repository with Pi package metadata and Git install support.
-- Pi package gallery eligibility is documented for npm packages with the `pi-package` keyword; GitHub-only indexing is not promised. Gallery listing is deferred until npm publication and verification.
-- npm publication is deferred until the user can register/publish an npm package.
-- Intended install form: `pi install git:<github-owner>/pi-ui-observer`.
+- Pi package gallery eligibility is documented for npm packages with the `pi-package` keyword; GitHub-only indexing is not promised. npm CLI is now authenticated; v0.1 will be published to GitHub and npm after release gates. Gallery listing must be verified independently.
+- Intended v0.1 install forms: `pi install git:github.com/hoanganhdev57/pi-ui-observer@v0.1.0` and `pi install npm:pi-ui-observer@0.1.0`.
 - Package manifest includes the `pi-package` keyword and Pi resource entries.
 - Repository target: `E:/Work/pi-ui-observer`.
 
@@ -212,3 +211,7 @@ pi-ui-observer/
 5. Install from GitHub in a clean Pi environment.
 6. Publish npm later without changing the package resource contract.
 7. Confirm Pi package gallery listing only after npm publication and observed indexing.
+
+## Approved read-only v0.1 release amendment
+
+The user approved a smaller first public release on 2026-10-02: read-only browser observation on isolated Playwright and approved loopback CDP sessions, with BrowserTools 2.0.2 registered through Pi native MCP only after explicit approval. Provide screenshot/ARIA+DOM snapshot/console/network/styles, responsive overflow measurements at five widths in isolated mode, and a skill that instructs the agent to compare evidence against design intent. Artifacts default to the user temporary directory. The audit must not equate captured evidence with design correctness. No action tools, watch mode, automated design verdict, or WebView2 support ship in v0.1; the earlier tool and feature lists remain later-phase design intent. Publish npm and GitHub only after clean-install tests, independent review, and CI. Gallery eligibility is not proof of listing; verify the listing after npm publication.
