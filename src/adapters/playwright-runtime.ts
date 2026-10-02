@@ -8,6 +8,7 @@ import type { AdapterTransport } from "./common.js";
 
 interface RuntimeOptions {
   cdpEndpoint?: string;
+  onPage?: (page: Page) => void;
 }
 
 export function selectAllowedPage<T extends { url(): string }>(pages: T[], requestedUrl?: string, allowedHosts: string[] = []): T | undefined {
@@ -68,6 +69,26 @@ export function createPlaywrightTransport(options: RuntimeOptions = {}): Adapter
         if (!executablePath) throw Object.assign(new Error("No Chrome/Chromium executable found"), { code: "ADAPTER_UNAVAILABLE" });
         browser = await chromium.launch({ headless: true, executablePath });
         context = await browser.newContext({ viewport: connectOptions.viewport, serviceWorkers: "block" });
+        let initialNavigationPending = true;
+        await context.route("**/*", async (route) => {
+          const request = route.request();
+          const target = request.url();
+          const initialNavigation = initialNavigationPending && connectOptions.url !== undefined && new URL(target).href === new URL(connectOptions.url).href;
+          if (request.isNavigationRequest()) {
+            if (initialNavigation) initialNavigationPending = false;
+            else {
+              networkEntries.push({ url: target, method: request.method(), blocked: true, reason: "New document navigation is disabled in isolated read-only mode" });
+              await route.abort("blockedbyclient");
+              return;
+            }
+          }
+          if (!isAllowedHost(target, policy) && !/^(?:data|blob|about):/.test(target)) {
+            networkEntries.push({ url: target, method: request.method(), blocked: true });
+            await route.abort("blockedbyclient");
+            return;
+          }
+          await route.continue();
+        });
         page = await context.newPage();
         isolatedFetchSession = await context.newCDPSession(page);
         isolatedFetchSession.on("Fetch.requestPaused", (event) => {
@@ -82,6 +103,7 @@ export function createPlaywrightTransport(options: RuntimeOptions = {}): Adapter
         await isolatedFetchSession.send("Fetch.enable", { patterns: [{ urlPattern: "*", requestStage: "Request" }] });
       }
       attachListeners(page);
+      options.onPage?.(page);
       if (connectOptions.url && new URL(page.url()).href !== new URL(connectOptions.url).href) await page.goto(connectOptions.url, { waitUntil: "domcontentloaded" });
       return { id: `playwright-${Date.now()}` };
     },

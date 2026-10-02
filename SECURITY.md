@@ -13,6 +13,7 @@
 - Cookies, authorization headers, tokens, and similar secrets are redacted.
 - Interactions and destructive operations require explicit approval.
 - No telemetry is added by this package.
+- Isolated mode blocks new document navigations and popups after the initial allowlisted page; this is a containment policy, not a general-purpose browser workflow.
 
 Do not connect the package to a personal browser profile when an isolated profile is sufficient. Review every adapter and MCP server before installation.
 

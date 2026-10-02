@@ -38,7 +38,7 @@ BrowserTools can see data in your actual Chrome session. Do not attach a persona
 
 ## Security defaults and limitations
 
-- Page navigation from `/ui connect` is limited to `localhost` and `127.0.0.1` by default. Isolated mode blocks outbound HTTP requests to other hosts. This can block third-party assets or APIs; blocked requests are reported in the audit.
+- Page navigation from `/ui connect` is limited to `localhost` and `127.0.0.1` by default. Isolated mode blocks outbound HTTP requests to other hosts and blocks new document navigations/popups after the initial page. This can block third-party assets, APIs, app redirects, or popup workflows; blocked requests are reported in the audit. Use the initial URL for each isolated observation run.
 - Chrome CDP and current-tab connections require user confirmation. A CDP endpoint must be loopback, and an attached tab outside the allowlist is rejected by the `ui_*` adapter.
 - Network/console text is redacted for common token patterns before reaching the model. This is best-effort: screenshots, page text, URLs, and third-party MCP tools can still expose sensitive material.
 - This **read-only v0.1** does not provide working click/fill/upload tools, automatic watch mode, native WebView2 capture, or a machine-verified design comparison. Interaction and watch mode are reserved for later releases.
