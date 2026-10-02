@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -21,7 +21,16 @@ describe("UI evidence reports", () => {
 
   it("stores default artifacts outside the project workspace", async () => {
     const output = await writeArtifact(`default-${Date.now()}`, { kind: "screenshot", bytes: Buffer.from("png") });
-    expect(output.path).toContain(join(tmpdir(), "pi-ui-observer"));
+    expect(output.path).toContain(join(tmpdir(), "pi-ui-observer-"));
+    if (process.platform !== "win32") {
+      expect((await stat(output.path)).mode & 0o077).toBe(0);
+      expect((await stat(join(output.path, ".."))).mode & 0o077).toBe(0);
+    }
+  });
+
+  it("reports failed transport requests without HTTP status", () => {
+    const audit = buildUiAudit({ snapshot: {}, screenshot: {}, console: [], network: [{ url: "http://127.0.0.1/api", failure: "net::ERR_CONNECTION_REFUSED" }] });
+    expect(audit.findings).toContainEqual(expect.objectContaining({ severity: "fail", message: expect.stringContaining("transport") }));
   });
 
   it("reports blocked or failed browser requests", () => {

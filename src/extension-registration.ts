@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Type } from "typebox";
 import { redactSecrets } from "./policy/redaction.js";
 import { collectAudit } from "./reports/collect.js";
@@ -35,10 +36,10 @@ export function registerUiObserver(pi: RegistrationApi, manager?: UiSessionManag
       if (!manager) return result({ error: "UI session manager is not initialized" });
       const screenshot = await manager.adapter().screenshot(params);
       if (!(screenshot.bytes instanceof Uint8Array)) return result({ error: "Adapter did not return PNG bytes" });
-      const artifact = await writeArtifact(`capture-${Date.now()}`, { kind: "screenshot", bytes: screenshot.bytes });
+      const artifact = await writeArtifact(`capture-${randomUUID()}`, { kind: "screenshot", bytes: screenshot.bytes });
       return { content: [
         { type: "text", text: `Screenshot saved: ${artifact.path}` },
-        { type: "image", source: { type: "base64", mediaType: "image/png", data: Buffer.from(screenshot.bytes).toString("base64") } },
+        { type: "image", mimeType: "image/png", data: Buffer.from(screenshot.bytes).toString("base64") },
       ], details: { path: artifact.path } };
     } },
     { name: "ui_console", description: "Read browser console entries.", parameters: Type.Object({}), execute: () => executeRead((s) => s.adapter().console()) },
@@ -99,7 +100,7 @@ export function registerUiObserver(pi: RegistrationApi, manager?: UiSessionManag
         if (command === "screenshot") {
           const screenshot = await manager.adapter().screenshot();
           if (!(screenshot.bytes instanceof Uint8Array)) throw new Error("Adapter did not return image bytes");
-          const artifact = await writeArtifact(`capture-${Date.now()}`, { kind: "screenshot", bytes: screenshot.bytes });
+          const artifact = await writeArtifact(`capture-${randomUUID()}`, { kind: "screenshot", bytes: screenshot.bytes });
           return ctx.ui?.notify?.(`Screenshot saved: ${artifact.path}`, "info");
         }
         return ctx.ui?.notify?.(`Unknown command: ${command}. Use status|connect|disconnect|inspect|screenshot|audit.`, "error");

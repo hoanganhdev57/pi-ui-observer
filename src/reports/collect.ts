@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { UiAdapter } from "../adapters/adapter.js";
 import { buildUiAudit, type UiAudit } from "./audit.js";
 import { writeArtifact } from "./artifacts.js";
@@ -28,7 +29,7 @@ export async function collectAudit(adapter: UiAdapter, options: { responsive?: b
       let path: string | undefined;
       capturedScreenshot ||= screenshot.bytes instanceof Uint8Array;
       if (options.persistScreenshots !== false && screenshot.bytes instanceof Uint8Array) {
-        path = (await writeArtifact(`audit-${Date.now()}-${size.width}x${size.height}`, { kind: "screenshot", bytes: screenshot.bytes })).path;
+        path = (await writeArtifact(`audit-${randomUUID()}-${size.width}x${size.height}`, { kind: "screenshot", bytes: screenshot.bytes })).path;
       }
       viewports.push({ width: size.width, height: size.height, documentWidth: typeof measurement.documentWidth === "number" ? measurement.documentWidth : undefined, horizontalOverflow: measurement.horizontalOverflow === true, screenshot: path });
     }

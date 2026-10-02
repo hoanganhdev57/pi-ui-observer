@@ -10,6 +10,11 @@ interface RuntimeOptions {
   cdpEndpoint?: string;
 }
 
+export function selectAllowedPage<T extends { url(): string }>(pages: T[], requestedUrl?: string, allowedHosts: string[] = []): T | undefined {
+  const policy = { ...defaultHostPolicy, allowedHosts };
+  return pages.find((candidate) => isAllowedHost(candidate.url(), policy) && (!requestedUrl || candidate.url() === requestedUrl));
+}
+
 export function createPlaywrightTransport(options: RuntimeOptions = {}): AdapterTransport {
   let browser: Browser | undefined;
   let context: BrowserContext | undefined;
@@ -44,8 +49,18 @@ export function createPlaywrightTransport(options: RuntimeOptions = {}): Adapter
       }
       if (options.cdpEndpoint) {
         browser = await chromium.connectOverCDP(options.cdpEndpoint);
-        context = browser.contexts()[0] ?? await browser.newContext();
-        page = context.pages()[0] ?? await context.newPage();
+        const contexts = browser.contexts();
+        page = selectAllowedPage(contexts.flatMap((existing) => existing.pages()), connectOptions.url, connectedAllowedHosts);
+        if (!page && connectOptions.url) {
+          context = contexts[0] ?? await browser.newContext();
+          page = await context.newPage();
+        }
+        if (!page) {
+          await browser.close();
+          browser = undefined;
+          throw Object.assign(new Error("No allowed Chrome tab is available; open a localhost tab or provide an allowed URL"), { code: "HOST_NOT_ALLOWED" });
+        }
+        context = page.context();
       } else {
         const executablePath = process.env.PI_UI_OBSERVER_CHROMIUM_PATH ?? await findChromiumExecutable();
         if (!executablePath) throw Object.assign(new Error("No Chrome/Chromium executable found"), { code: "ADAPTER_UNAVAILABLE" });
@@ -63,13 +78,7 @@ export function createPlaywrightTransport(options: RuntimeOptions = {}): Adapter
         page = await context.newPage();
       }
       attachListeners(page);
-      if (options.cdpEndpoint && !isAllowedHost(page.url(), policy)) {
-        await browser.close();
-        browser = undefined;
-        page = undefined;
-        throw Object.assign(new Error("Attached tab is not allowed by host policy"), { code: "HOST_NOT_ALLOWED" });
-      }
-      if (connectOptions.url) await page.goto(connectOptions.url, { waitUntil: "domcontentloaded" });
+      if (connectOptions.url && page.url() !== connectOptions.url) await page.goto(connectOptions.url, { waitUntil: "domcontentloaded" });
       return { id: `playwright-${Date.now()}` };
     },
     async disconnect() {

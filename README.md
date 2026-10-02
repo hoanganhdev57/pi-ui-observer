@@ -22,7 +22,7 @@ Start Pi in any project and start that project's dev server separately. Then:
 /ui disconnect
 ```
 
-Pi also exposes `ui_current_page`, `ui_snapshot`, `ui_screenshot`, `ui_styles`, `ui_console`, `ui_network`, and `ui_audit` as model-callable tools. `ui_screenshot` returns an image to Pi plus a local artifact path. `/ui audit` takes screenshots at 1280, 768, 414, 375, and 320 CSS-pixel widths in isolated mode, flags horizontal overflow and console/network errors, and restores the original viewport. Screenshots are stored in the system temporary directory under `pi-ui-observer/runs/` and may contain private page data; remove them when no longer needed.
+Pi also exposes `ui_current_page`, `ui_snapshot`, `ui_screenshot`, `ui_styles`, `ui_console`, `ui_network`, and `ui_audit` as model-callable tools. `ui_screenshot` returns an image to Pi plus a local artifact path. `/ui audit` takes screenshots at 1280, 768, 414, 375, and 320 CSS-pixel widths in isolated mode, flags horizontal overflow and console/network errors, and restores the original viewport. Screenshots are stored in a private per-process `pi-ui-observer-*` directory in the system temporary directory and may contain private page data; remove them when no longer needed.
 
 These checks collect **evidence**, not an automatic design verdict. Ask Pi to compare the screenshots and semantic snapshot with your project's design specification. The included `ui-verification` skill describes that workflow. A screenshot alone never produces a visual PASS.
 

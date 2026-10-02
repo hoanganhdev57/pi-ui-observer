@@ -54,6 +54,24 @@ describe("/ui commands", () => {
     expect(response.content[0].text).toContain("320");
   });
 
+  it("two screenshots captured in the same millisecond have unique artifacts", async () => {
+    const f = setup();
+    await f.handler("connect isolated http://127.0.0.1:3000", f.ctx);
+    const clock = vi.spyOn(Date, "now").mockReturnValue(456);
+    try {
+      const first = await f.tools.get("ui_screenshot")!.execute("id", {});
+      const second = await f.tools.get("ui_screenshot")!.execute("id", {});
+      expect(first.content[0].text).not.toBe(second.content[0].text);
+    } finally { clock.mockRestore(); }
+  });
+
+  it("ui_screenshot returns Pi-native image data and MIME type", async () => {
+    const f = setup();
+    await f.handler("connect isolated http://127.0.0.1:3000", f.ctx);
+    const output = await f.tools.get("ui_screenshot")!.execute("id", {});
+    expect(output.content).toContainEqual(expect.objectContaining({ type: "image", mimeType: "image/png", data: Buffer.from("fake").toString("base64") }));
+  });
+
   it("/ui screenshot saves an image artifact", async () => {
     const f = setup();
     await f.handler("connect isolated http://127.0.0.1:3000", f.ctx);

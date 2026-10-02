@@ -1,6 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { collectAudit, DEFAULT_VIEWPORTS } from "../src/reports/collect.js";
 import type { UiAdapter } from "../src/adapters/adapter.js";
+
+it("keeps artifacts from consecutive audits distinct even in the same millisecond", async () => {
+  const adapter = {
+    currentPage: async () => ({ url: "http://127.0.0.1:3000", title: "Demo", viewport: { width: 1280, height: 720 } }),
+    audit: async () => ({}), screenshot: async () => ({ bytes: Buffer.from("fixture") }),
+    snapshot: async () => ({ nodes: [] }), console: async () => ({ entries: [] }), network: async () => ({ requests: [] }),
+  } as unknown as UiAdapter;
+  const clock = vi.spyOn(Date, "now").mockReturnValue(123);
+  try {
+    const first = await collectAudit(adapter);
+    const second = await collectAudit(adapter);
+    expect(first.viewports[0].screenshot).not.toBe(second.viewports[0].screenshot);
+  } finally { clock.mockRestore(); }
+});
 
 it("does not claim a screenshot when adapter returns no image", async () => {
   const adapter = {
