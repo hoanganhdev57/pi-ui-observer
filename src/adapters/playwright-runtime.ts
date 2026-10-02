@@ -1,7 +1,7 @@
 import { access } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright-core";
+import { chromium, type Browser, type BrowserContext, type CDPSession, type Page } from "playwright-core";
 import { defaultHostPolicy, isAllowedHost } from "../policy/hosts.js";
 import type { ConnectOptions } from "./adapter.js";
 import type { AdapterTransport } from "./common.js";
@@ -12,13 +12,15 @@ interface RuntimeOptions {
 
 export function selectAllowedPage<T extends { url(): string }>(pages: T[], requestedUrl?: string, allowedHosts: string[] = []): T | undefined {
   const policy = { ...defaultHostPolicy, allowedHosts };
-  return pages.find((candidate) => isAllowedHost(candidate.url(), policy) && (!requestedUrl || candidate.url() === requestedUrl));
+  const normalizedRequested = requestedUrl ? new URL(requestedUrl).href : undefined;
+  return pages.find((candidate) => isAllowedHost(candidate.url(), policy) && (!normalizedRequested || new URL(candidate.url()).href === normalizedRequested));
 }
 
 export function createPlaywrightTransport(options: RuntimeOptions = {}): AdapterTransport {
   let browser: Browser | undefined;
   let context: BrowserContext | undefined;
   let page: Page | undefined;
+  let isolatedFetchSession: CDPSession | undefined;
   let connectedAllowedHosts: string[] = [];
   const consoleEntries: Record<string, unknown>[] = [];
   const networkEntries: Record<string, unknown>[] = [];
@@ -65,24 +67,27 @@ export function createPlaywrightTransport(options: RuntimeOptions = {}): Adapter
         const executablePath = process.env.PI_UI_OBSERVER_CHROMIUM_PATH ?? await findChromiumExecutable();
         if (!executablePath) throw Object.assign(new Error("No Chrome/Chromium executable found"), { code: "ADAPTER_UNAVAILABLE" });
         browser = await chromium.launch({ headless: true, executablePath });
-        context = await browser.newContext({ viewport: connectOptions.viewport });
-        await context.route("**/*", async (route) => {
-          const target = route.request().url();
-          if (!isAllowedHost(target, policy) && !/^(?:data|blob|about):/.test(target)) {
-            networkEntries.push({ url: target, method: route.request().method(), blocked: true });
-            await route.abort("blockedbyclient");
-            return;
-          }
-          await route.continue();
-        });
+        context = await browser.newContext({ viewport: connectOptions.viewport, serviceWorkers: "block" });
         page = await context.newPage();
+        isolatedFetchSession = await context.newCDPSession(page);
+        isolatedFetchSession.on("Fetch.requestPaused", (event) => {
+          const target = event.request.url;
+          const allowed = isAllowedHost(target, policy) || /^(?:data|blob|about):/.test(target);
+          if (!allowed) networkEntries.push({ url: target, method: event.request.method, blocked: true });
+          const operation = allowed
+            ? isolatedFetchSession?.send("Fetch.continueRequest", { requestId: event.requestId })
+            : isolatedFetchSession?.send("Fetch.failRequest", { requestId: event.requestId, errorReason: "BlockedByClient" });
+          void operation?.catch((error: unknown) => consoleEntries.push({ level: "error", text: `Request interception failed: ${String(error)}` }));
+        });
+        await isolatedFetchSession.send("Fetch.enable", { patterns: [{ urlPattern: "*", requestStage: "Request" }] });
       }
       attachListeners(page);
-      if (connectOptions.url && page.url() !== connectOptions.url) await page.goto(connectOptions.url, { waitUntil: "domcontentloaded" });
+      if (connectOptions.url && new URL(page.url()).href !== new URL(connectOptions.url).href) await page.goto(connectOptions.url, { waitUntil: "domcontentloaded" });
       return { id: `playwright-${Date.now()}` };
     },
     async disconnect() {
       if (browser) await browser.close();
+      isolatedFetchSession = undefined;
       browser = undefined;
       context = undefined;
       page = undefined;
